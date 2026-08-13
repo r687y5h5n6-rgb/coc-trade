@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>部落冲突兵种卡牌交换匹配工具【云端共享版】</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;font-family:system-ui,"Microsoft YaHei",sans-serif;}
+body{max-width:1000px;margin:24px auto;padding:0 16px;background:#f7f8fa;color:#222;line-height:1.55;}
+h2{text-align:center;color:#222;margin-bottom:8px;font-size:24px;}
+.remind-notice{
+    text-align:center;
+    font-size:20px;
+    font-weight:800;
+    margin-bottom:24px;
+    background:linear-gradient(90deg,#ff4d4d,#ff9900,#ffcc00,#33cc33,#3399ff,#9966cc,#ff4d4d);
+    background-size:400% 100%;
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+    animation:rainbowFlow 6s linear infinite;
+}
+@keyframes rainbowFlow{
+    0%{background-position:0% 0%;}
+    100%{background-position:400% 0%;}
+}
+.box{
+    background:#fff;
+    padding:20px;
+    border-radius:12px;
+    box-shadow:0 2px 12px rgba(0,0,0,0.06);
+    margin-bottom:18px;
+}
+button{
+    padding:9px 16px;
+    border:none;
+    border-radius:8px;
+    color:#fff;
+    cursor:pointer;
+    margin:4px;
+    font-size:14px;
+    transition:opacity 0.2s;
+    background:#607d8b;
+}
+button:hover{opacity:0.9;}
+button.del{background:#e54343;}
+button.edit{background:#f39c12;}
+button.run{background:#27ae60;}
+button.copy{background:#9b59b6;}
+button.toggle-list{background:#333333;}
+button.page-btn{background:#666666;}
+button.clear-login{background:#777777;}
+button.refresh{background:#2563eb;}
+button.disabled{background:#bbbbbb;cursor:not-allowed;opacity:0.65 !important;}
+
+.player-item{
+    padding:16px;
+    border:1px solid #e4e7ed;
+    border-radius:10px;
+    margin:12px 0;
+    transition:0.2s;
+}
+.player-item.myself{
+    background:#ecf5ff;
+    border-color:#69a8ff;
+}
+.player-item:hover{box-shadow:0 2px 8px rgba(0,0,0,0.05);}
+
+.res{
+    white-space:pre;
+    background:#f0f4ff;
+    padding:16px;
+    border-radius:10px;
+    margin-top:12px;
+    min-height:160px;
+    line-height:1.65;
+    font-family:"Consolas",monospace;
+    font-size:14px;
+}
+.row{margin:14px 0;}
+label.title{
+    display:block;
+    margin:8px 0 6px;
+    font-weight:600;
+    font-size:15px;
+}
+input{
+    width:100%;
+    padding:10px 12px;
+    border:1px solid #dcdfe6;
+    border-radius:8px;
+    font-size:14px;
+    transition:border 0.2s;
+}
+input:focus{outline:none;border-color:#69a8ff;}
+
+.cat-title{
+    font-weight:bold;
+    color:#2563eb;
+    font-size:16px;
+    margin:14px 0 8px;
+}
+.section-label{
+    color:#e54343;
+    font-weight:bold;
+    margin:6px 0;
+    display:block;
+}
+.card-tag{
+    display:inline-block;
+    padding:6px 11px;
+    margin:5px;
+    border:1px solid #dcdfe6;
+    border-radius:7px;
+    cursor:pointer;
+    font-size:14px;
+    transition:0.2s;
+    background:#fff;
+}
+.card-tag:hover{border-color:#99bfff;}
+.card-tag.active{
+    background:#4068ee;
+    color:#fff;
+    border-color:#4068ee;
+}
+.tag-wrap{margin-bottom:12px;}
+.tip-text{color:#dd3333;font-size:14px;margin:4px 0;}
+.list-header{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+.list-header h3{margin:0;font-size:20px;}
+.pagination-bar{margin-top:14px;text-align:center;}
+
+.player-cat-name{
+    color:#2563eb;
+    font-weight:bold;
+    margin-top:10px;
+    font-size:16px;
+}
+.player-extra-label,
+.player-need-label{
+    color:#e54343;
+    font-weight:bold;
+    margin-right:8px;
+}
+.warn-text{
+    color:#d92121;
+    font-weight:bold;
+    font-size:14px;
+    margin:6px 0 10px;
+}
+.check-row{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap;}
+.check-row input{width:auto;}
+.loading-hint{color:#2563eb;font-weight:bold;text-align:center;margin:10px 0;font-size:16px;}
+</style>
+</head>
+<body>
+<h2>部落冲突兵种卡牌交换匹配工具【云端共享版】</h2>
+<div class="remind-notice">云端数据实时同步，群内所有人共用一份名单！交换卡牌后记得更新列表信息</div>
+
+<div class="box">
+    <div class="row">
+        <label class="title">你的QQ号（身份标识，用于权限校验）</label>
+        <input id="selfQQ" placeholder="请输入QQ号，作为唯一身份">
+        <div class="tip-text">⚠️ 输入QQ号后，如果云端存在你的记录会自动加载第一条信息进入编辑</div>
+    </div>
+    <div class="row">
+        <label class="title">所在群群号</label>
+        <input id="groupNum" placeholder="填写需要交换的目标QQ群群号">
+        <div class="tip-text">⚠️ 仅相同群号的成员之间会进行交换匹配</div>
+    </div>
+    <div class="check-row">
+        <input type="checkbox" id="rememberLogin">
+        <label for="rememberLogin">记住我的QQ号与群号（下次打开自动填充）</label>
+        <button class="clear-login" onclick="clearLoginInfo()">清除已保存信息</button>
+    </div>
+</div>
+
+<div class="box">
+<h3>添加玩家信息 <span id="editTip" style="color:#f39c12;display:none;">【编辑模式】修改完成后点击保存玩家</span></h3>
+<div class="row">
+    <label class="title">群昵称（游戏有小号的情况下可以在昵称后面加个“（小号）”）</label>
+    <div class="warn-text">⚠️ 群昵称如果相同的话请在群内更改昵称，匹配成功后可在群内艾特对应群友进行沟通</div>
+    <input id="nickName" placeholder="输入你的群昵称">
+</div>
+
+<div id="cardMainPanel"></div>
+
+<div style="margin-top:12px;">
+    <button id="saveBtn" class="run" onclick="addPlayer()">新增玩家</button>
+    <button onclick="cancelEdit()">取消编辑</button>
+</div>
+</div>
+
+<div class="box">
+<div class="list-header">
+    <h3>已录入玩家列表</h3>
+    <button class="toggle-list" onclick="togglePlayerList()">收起列表</button>
+    <button class="refresh" onclick="fetchAllPlayers()">🔄 刷新云端数据</button>
+</div>
+<div id="playerListWrap">
+    <div id="loadingBox" class="loading-hint">正在从云端加载数据...</div>
+    <div id="playerList"></div>
+    <div class="pagination-bar" id="pageBar"></div>
+</div>
+</div>
+
+<div class="box">
+<button class="run" onclick="matchTrade()">开始匹配可交换组合</button>
+<button class="copy" onclick="copyResult()">复制匹配结果</button>
+<div class="res" id="result">匹配结果会显示在这里</div>
+</div>
+
+<script>
+// ===================== 修改这里 =====================
+const SUPABASE_URL = "https://pieiqwijxatssefbuyll.supabase.co";
+// 【重要！】替换为你后台重新生成的新密钥！旧密钥已经泄露！
+const SUPABASE_ANON_KEY = "sb_publishable_muupKx9zSPp6kNAoMOosyw_vKKOOyTB";
+// ====================================================
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const cardData = {
+    "圣水": ["蛮子", "弓箭", "胖子", "哥布林", "炸弹人", "气球", "法师", "天使", "飞龙", "皮卡", "龙宝", "矿工", "雷龙", "雪怪", "龙骑士", "泰坦", "根蔓", "牙签", "陨石哥伦"],
+    "黑油": ["亡灵", "野猪", "武神", "石头人", "女巫", "天狗", "蓝胖", "冰人", "猎手", "小永王", "格鲁伊", "熔炉", "废墟女巫"],
+    "夜世界": ["蛮子", "弓箭", "胖子", "亡灵", "炸弹人", "龙宝", "加农炮", "女巫", "气球", "皮卡", "飞猪"],
+    "超级兵": ["超蛮", "超弓", "超胖", "超哥", "超炸", "超球", "超法", "超龙", "地狱龙", "超矿", "超级雪怪", "超级亡灵", "超猪", "超级武神", "超巫", "冰狗", "超蓝"]
+};
+
+let selectedExtra = new Set();
+let selectedNeed = new Set();
+let editRecordId = null;
+let allPlayers = [];
+let playerListOpen = true;
+const PAGE_SIZE = 10;
+let currentPage = 1;
+const LOGIN_KEY = "trade_login_info";
+
+function loadLoginInfo(){
+    const saved = localStorage.getItem(LOGIN_KEY);
+    if(saved){
+        const info = JSON.parse(saved);
+        document.getElementById('selfQQ').value = info.qq || '';
+        document.getElementById('groupNum').value = info.group || '';
+        document.getElementById('rememberLogin').checked = true;
+        triggerAutoLoadSelfRecord();
+    }
+}
+function saveLoginInfo(){
+    const checked = document.getElementById('rememberLogin').checked;
+    if(!checked){
+        localStorage.removeItem(LOGIN_KEY);
+        return;
+    }
+    const qq = document.getElementById('selfQQ').value.trim();
+    const group = document.getElementById('groupNum').value.trim();
+    localStorage.setItem(LOGIN_KEY, JSON.stringify({qq, group}));
+}
+function clearLoginInfo(){
+    localStorage.removeItem(LOGIN_KEY);
+    document.getElementById('selfQQ').value = '';
+    document.getElementById('groupNum').value = '';
+    document.getElementById('rememberLogin').checked = false;
+    alert("已清除保存的登录信息");
+}
+
+async function fetchAllPlayers(){
+    document.getElementById("loadingBox").style.display = "block";
+    document.getElementById("playerList").innerHTML = "";
+    const {data, error} = await supabase
+        .from('player_data')
+        .select('*')
+        .order('created_at', {asc:false});
+    if(error){
+        alert("云端数据加载失败："+error.message);
+        document.getElementById("loadingBox").style.display = "none";
+        return;
+    }
+    allPlayers = data.map(item=>{
+        return {
+            id: item.id,
+            qq: item.qq,
+            groupnum: item.groupnum,
+            nickName: item.nickName,
+            extra: JSON.parse(item.extra),
+            need: JSON.parse(item.need)
+        };
+    });
+    document.getElementById("loadingBox").style.display = "none";
+    renderPlayer();
+}
+
+function triggerAutoLoadSelfRecord(){
+    const qq = document.getElementById('selfQQ').value.trim();
+    if(!qq || allPlayers.length ===0) return;
+    const myRecords = allPlayers.filter(p => p.qq === qq);
+    if(myRecords.length <=0) return;
+    startEditById(myRecords[0].id);
+}
+
+document.getElementById('selfQQ').addEventListener('change', ()=>{
+    saveLoginInfo();
+    triggerAutoLoadSelfRecord();
+});
+document.getElementById('groupNum').addEventListener('change', saveLoginInfo);
+document.getElementById('rememberLogin').addEventListener('change', saveLoginInfo);
+
+function renderCardPanel(){
+    const mainWrap = document.getElementById('cardMainPanel');
+    mainWrap.innerHTML = '';
+    for(const cat in cardData){
+        const block = document.createElement('div');
+        block.className = 'tag-wrap';
+        block.innerHTML = `<div class="cat-title">【${cat}】</div>`;
+        const extraLine = document.createElement('div');
+        extraLine.innerHTML = `<span class="section-label">多余卡牌（点击勾选）</span>`;
+        cardData[cat].forEach(name=>{
+            const key = `${cat}|${name}`;
+            const span = document.createElement('span');
+            span.className = 'card-tag';
+            if(selectedExtra.has(key)) span.classList.add('active');
+            span.innerText = name;
+            span.onclick = ()=>{
+                selectedExtra.has(key) ? selectedExtra.delete(key) : selectedExtra.add(key);
+                renderCardPanel();
+            };
+            extraLine.appendChild(span);
+        });
+        block.appendChild(extraLine);
+        const needLine = document.createElement('div');
+        needLine.innerHTML = `<span class="section-label">需要卡牌（点击勾选）</span>`;
+        cardData[cat].forEach(name=>{
+            const key = `${cat}|${name}`;
+            const span = document.createElement('span');
+            span.className = 'card-tag';
+            if(selectedNeed.has(key)) span.classList.add('active');
+            span.innerText = name;
+            span.onclick = ()=>{
+                selectedNeed.has(key) ? selectedNeed.delete(key) : selectedNeed.add(key);
+                renderCardPanel();
+            };
+            needLine.appendChild(span);
+        });
+        block.appendChild(needLine);
+        mainWrap.appendChild(block);
+    }
+}
+
+function clearSelectStatus(){
+    selectedExtra.clear();
+    selectedNeed.clear();
+    renderCardPanel();
+}
+function checkDuplicateCard(){
+    for(const key of selectedExtra){
+        if(selectedNeed.has(key)) return false;
+    }
+    return true;
+}
+
+async function addPlayer(){
+    const selfQQ = document.getElementById('selfQQ').value.trim();
+    const inputGroupNum = document.getElementById('groupNum').value.trim();
+    const nickName = document.getElementById('nickName').value.trim();
+    if(!selfQQ){alert("请填写你的QQ号！");return;}
+    if(!inputGroupNum){alert("请填写群号！");return;}
+    if(!nickName){alert("请填写群昵称！");return;}
+    if(!checkDuplicateCard()){
+        alert("同一个兵种不能同时勾选多余和需要！");
+        return;
+    }
+    const payload = {
+        qq:selfQQ,
+        groupnum: inputGroupNum,
+        nickName,
+        extra: JSON.stringify(Array.from(selectedExtra)),
+        need: JSON.stringify(Array.from(selectedNeed))
+    };
+    if(editRecordId){
+        const {error} = await supabase
+            .from('player_data')
+            .update(payload)
+            .eq('id', editRecordId);
+        if(error){alert("更新失败："+error.message);return;}
+        alert("信息更新成功！");
+    }else{
+        const {error} = await supabase.from('player_data').insert(payload);
+        if(error){alert("新增失败："+error.message);return;}
+        alert("新增成功！");
+    }
+    await fetchAllPlayers();
+    cancelEdit();
+}
+
+function startEditById(id){
+    const target = allPlayers.find(x=>x.id === id);
+    if(!target) return;
+    editRecordId = id;
+    document.getElementById('groupNum').value = target.groupnum;
+    document.getElementById('nickName').value = target.nickName;
+    selectedExtra = new Set(target.extra);
+    selectedNeed = new Set(target.need);
+    renderCardPanel();
+    document.getElementById('editTip').style.display = 'inline';
+    document.getElementById('saveBtn').innerText = '保存玩家';
+    window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function cancelEdit(){
+    editRecordId = null;
+    document.getElementById('editTip').style.display = 'none';
+    document.getElementById('saveBtn').innerText = '新增玩家';
+    document.getElementById('nickName').value = '';
+    clearSelectStatus();
+}
+
+function renderPlayer(){
+    const selfQQ = document.getElementById('selfQQ').value.trim();
+    const wrap = document.getElementById('playerList');
+    const pageBar = document.getElementById('pageBar');
+    wrap.innerHTML = '';
+    const myItems = allPlayers.filter(item => item.qq === selfQQ);
+    const otherItems = allPlayers.filter(item => item.qq !== selfQQ);
+    const sortedList = [...myItems, ...otherItems];
+    const total = sortedList.length;
+    const totalPage = Math.ceil(total / PAGE_SIZE);
+    if(currentPage > totalPage && totalPage>0) currentPage = totalPage;
+    const start = (currentPage - 1)*PAGE_SIZE;
+    const pageData = sortedList.slice(start, start+PAGE_SIZE);
+
+    pageData.forEach((p)=>{
+        const div = document.createElement('div');
+        const isOwner = selfQQ === p.qq;
+        if(isOwner) div.className='player-item myself';
+        else div.className='player-item';
+        const editBtn = isOwner
+            ? `<button class="edit" onclick="startEditById('${p.id}')">编辑</button>`
+            : `<button class="edit disabled" disabled>编辑（仅本人）</button>`;
+        const delBtn = isOwner
+            ? `<button class="del" onclick="delRecord('${p.id}')">删除</button>`
+            : `<button class="del disabled" disabled>删除（仅本人）</button>`;
+        const extraMap = {};
+        p.extra.forEach(key=>{
+            const [cat,card] = key.split('|');
+            if(!extraMap[cat]) extraMap[cat]=[];
+            extraMap[cat].push(card);
+        });
+        const needMap = {};
+        p.need.forEach(key=>{
+            const [cat,card] = key.split('|');
+            if(!needMap[cat]) needMap[cat]=[];
+            needMap[cat].push(card);
+        });
+        const allCats = [...new Set([...Object.keys(extraMap), ...Object.keys(needMap)])];
+        let catHtml = '';
+        allCats.forEach(cat=>{
+            const ex = extraMap[cat]||[];
+            const nd = needMap[cat]||[];
+            catHtml += `<div class="player-cat-name">${cat}</div>`;
+            if(ex.length>0) catHtml += `<div><span class="player-extra-label">多余卡牌</span>${ex.join('、')}</div>`;
+            if(nd.length>0) catHtml += `<div><span class="player-need-label">需要卡牌</span>${nd.join('、')}</div>`;
+        });
+        div.innerHTML = `<strong style="font-size:18px;">${p.nickName}</strong>${editBtn}${delBtn}<br><div style="margin-top:8px;">${catHtml}</div>`;
+        wrap.appendChild(div);
+    });
+    pageBar.innerHTML = '';
+    if(totalPage <=1) return;
+    const prevBtn = document.createElement('button');
+    prevBtn.className='page-btn';prevBtn.innerText='上一页';
+    prevBtn.disabled = currentPage===1;
+    prevBtn.onclick=()=>{currentPage--;renderPlayer();};
+    pageBar.appendChild(prevBtn);
+    const info = document.createElement('span');
+    info.style.margin='0 10px';
+    info.innerText=`第${currentPage}/${totalPage}页 (共${total}人)`;
+    pageBar.appendChild(info);
+    const nextBtn = document.createElement('button');
+    nextBtn.className='page-btn';nextBtn.innerText='下一页';
+    nextBtn.disabled = currentPage === totalPage;
+    nextBtn.onclick=()=>{currentPage++;renderPlayer();};
+    pageBar.appendChild(nextBtn);
+}
+
+async function delRecord(id){
+    const selfQQ = document.getElementById('selfQQ').value.trim();
+    const target = allPlayers.find(x=>x.id===id);
+    if(target.qq !== selfQQ){
+        alert("只能删除自己的记录！");
+        return;
+    }
+    if(!confirm("确定删除这条记录？云端数据会直接清除！")) return;
+    const {error} = await supabase.from('player_data').delete().eq('id',id);
+    if(error){alert("删除失败："+error.message);return;}
+    await fetchAllPlayers();
+    if(editRecordId === id) cancelEdit();
+}
+
+function togglePlayerList(){
+    playerListOpen = !playerListOpen;
+    const wrap = document.getElementById('playerListWrap');
+    const btn = document.querySelector('.toggle-list');
+    if(playerListOpen){wrap.style.display='block';btn.innerText='收起列表';}
+    else {wrap.style.display='none';btn.innerText='展开列表';}
+}
+
+let lastResultText = "";
+function matchTrade(){
+    const selfQQ = document.getElementById('selfQQ').value.trim();
+    const myGroupInput = document.getElementById('groupNum').value.trim();
+    if(!selfQQ){alert("请填写QQ号！");return;}
+    if(!myGroupInput){alert("请填写群号！");return;}
+    const resBox = document.getElementById('result');
+    const trades = [];
+    const list = allPlayers;
+    for(let i=0;i<list.length;i++){
+        const p1 = list[i];
+        for(let j=i+1;j<list.length;j++){
+            const p2 = list[j];
+            if(p1.groupnum !== p2.groupnum) continue;
+            if(p1.qq !== selfQQ && p2.qq !== selfQQ) continue;
+            const p1Give = p1.extra.filter(k=>p2.need.includes(k));
+            const p2Give = p2.extra.filter(k=>p1.need.includes(k));
+            if(p1Give.length>0 && p2Give.length>0){
+                const group = {};
+                p1Give.forEach(k=>{
+                    const [cat,name]=k.split('|');
+                    if(!group[cat]) group[cat]={a:[],b:[]};
+                    group[cat].a.push(name);
+                });
+                p2Give.forEach(k=>{
+                    const [cat,name]=k.split('|');
+                    if(!group[cat]) group[cat]={a:[],b:[]};
+                    group[cat].b.push(name);
+                });
+                trades.push({a:p1.nickName,b:p2.nickName,groups:group,groupnum:p1.groupnum});
+            }
+        }
+    }
+    if(trades.length===0){
+        lastResultText = "===== 可双向交换列表（仅同群、同分类卡牌匹配）=====\n【规则】仅相同群号成员匹配；圣水↔圣水 / 黑油↔黑油 / 夜世界↔夜世界 / 超级兵↔超级兵，跨分类禁止交换\n✅ 查询完成，暂无和你相关的【同群同分类双向可交换】组合！";
+        resBox.innerText = lastResultText;
+        return;
+    }
+    let text = "===== 可双向交换列表（仅同群、同分类卡牌匹配）=====\n【规则】仅相同群号成员匹配；圣水↔圣水 / 黑油↔黑油 / 夜世界↔夜世界 / 超级兵↔超级兵，跨分类禁止交换\n\n";
+    trades.forEach((t,idx)=>{
+        text += `【组合${idx+1}】群号：${t.groupnum}\n`;
+        const indent = "    ";
+        text += `${indent}交换双方    ${t.a}        ${t.b}\n`;
+        for(const cat in t.groups){
+            const arrA = [...new Set(t.groups[cat].a)];
+            const arrB = [...new Set(t.groups[cat].b)];
+            text += `${indent}${cat}    ${arrA.join('、')}        ${arrB.join('、')}\n`;
+        }
+        text += "\n";
+    });
+    lastResultText = text;
+    resBox.innerText = lastResultText;
+}
+function copyResult(){
+    if(!lastResultText){alert("暂无匹配结果");return;}
+    navigator.clipboard.writeText(lastResultText).then(()=>alert("匹配结果已复制到剪贴板"));
+}
+
+window.onload = async function(){
+    renderCardPanel();
+    loadLoginInfo();
+    await fetchAllPlayers();
+}
+</script>
+</body>
+</html>
